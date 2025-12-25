@@ -1,0 +1,115 @@
+services:
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.101.0
+    container_name: victoriametrics
+    ports:
+      - "8428:8428"
+    command:
+      - "-retentionPeriod=1"
+    restart: always
+
+  redis:
+    image: redis:7-alpine
+    container_name: redis_server
+    ports:
+      - "6379:6379"
+    restart: always
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: otel-collector
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    command: ["--config=/etc/otelcol-contrib/config.yaml"]
+    depends_on:
+      - victoriametrics
+    restart: always
+
+  django_app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_app
+    command: >
+      sh -c "python manage.py collectstatic --noinput && 
+             gunicorn -c gunicorn_config.py prime_numbers.wsgi --bind 0.0.0.0:8000 --reload"
+    volumes:
+      - .:/code
+      - static_volume:/code/staticfiles
+    ports:
+      - "8000:8000"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - REDIS_URL=redis://redis_server:6379/0
+      - CELERY_BROKER_URL=redis://redis_server:6379/0
+      - DJANGO_SETTINGS_MODULE=prime_numbers.settings
+    depends_on:
+      - redis
+      - otel-collector
+    restart: always
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: celery_worker
+    command: celery -A prime_numbers worker -l info
+    volumes:
+      - .:/code
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - REDIS_URL=redis://redis_server:6379/0
+      - CELERY_BROKER_URL=redis://redis_server:6379/0
+      - DJANGO_SETTINGS_MODULE=prime_numbers.settings
+    depends_on:
+      - redis
+      - otel-collector
+    restart: always
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./tempo-config.yaml:/etc/tempo.yaml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"   # tempo
+      - "4317"        # otlp grpc
+    restart: always
+
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    ports:
+      - "3100:3100"
+    volumes:
+      - loki_data:/loki
+    restart: always
+
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_INSTALL_PLUGINS=victoriametrics-metrics-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yaml:/etc/grafana/provisioning/datasources/datasources.yaml
+    depends_on:
+      - tempo
+      - loki
+      - victoriametrics
+    restart: always
+
+# ADD THIS SECTION AT THE VERY BOTTOM:
+volumes:
+  static_volume:
+  grafana_data:
+  tempo_data:
+  loki_data:
