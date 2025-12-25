@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     CELERY_BROKER_TRANSPORT_OPTIONS: dict = {
         "visibility_timeout": 3600
     }
+    DATABASE_URL: str = "sqlite: // /./ prime_numbers.db"
 
     # OpenTelemetry
     OTEL_EXPORTER_OTLP_ENDPOINT: str = "http://otel-collector:4318"

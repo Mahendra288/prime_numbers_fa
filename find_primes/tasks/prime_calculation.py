@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from celery_app.app import celery_app
 from celery_app.traced_task import TracedTask
 from db.session import SessionLocal
-from business_logic import primes_calculation
+from find_primes import primes_calculation
 tracer = trace.get_tracer(__name__)
 
 

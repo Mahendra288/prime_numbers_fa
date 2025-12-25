@@ -28,24 +28,26 @@ services:
       - victoriametrics
     restart: always
 
-  django_app:
+  fastapi_app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: django_app
+    container_name: fastapi_app
     command: >
-      sh -c "python manage.py collectstatic --noinput && 
-             gunicorn -c gunicorn_config.py prime_numbers.wsgi --bind 0.0.0.0:8000 --reload"
+      uvicorn main:app
+      --host 0.0.0.0
+      --port 8000
+      --reload
     volumes:
       - .:/code
-      - static_volume:/code/staticfiles
     ports:
       - "8000:8000"
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - REDIS_URL=redis://redis_server:6379/0
       - CELERY_BROKER_URL=redis://redis_server:6379/0
-      - DJANGO_SETTINGS_MODULE=prime_numbers.settings
+      - DATABASE_URL=sqlite:///./prime_numbers.db
+      - APP_ENV=local
     depends_on:
       - redis
       - otel-collector
@@ -56,14 +58,15 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: celery_worker
-    command: celery -A prime_numbers worker -l info
+    command: celery -A celery_app.app:celery_app worker -l info
     volumes:
       - .:/code
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - REDIS_URL=redis://redis_server:6379/0
       - CELERY_BROKER_URL=redis://redis_server:6379/0
-      - DJANGO_SETTINGS_MODULE=prime_numbers.settings
+      - DATABASE_URL=sqlite:///./prime_numbers.db
+      - CELERY_RESULT_BACKEND=redis://redis_server:6379/1
     depends_on:
       - redis
       - otel-collector
@@ -72,19 +75,20 @@ services:
   tempo:
     image: grafana/tempo:latest
     container_name: tempo
-    command: [ "-config.file=/etc/tempo.yaml" ]
+    user: "0:0"
+    command: ["-config.file=/etc/tempo.yaml"]
     volumes:
       - ./tempo-config.yaml:/etc/tempo.yaml
       - tempo_data:/tmp/tempo
     ports:
-      - "3200:3200"   # tempo
-      - "4317"        # otlp grpc
+      - "3200:3200"
+      - "4317"
     restart: always
 
   loki:
     image: grafana/loki:latest
     container_name: loki
-    command: [ "-config.file=/etc/loki/local-config.yaml" ]
+    command: ["-config.file=/etc/loki/local-config.yaml"]
     ports:
       - "3100:3100"
     volumes:
@@ -107,9 +111,7 @@ services:
       - victoriametrics
     restart: always
 
-# ADD THIS SECTION AT THE VERY BOTTOM:
 volumes:
-  static_volume:
   grafana_data:
   tempo_data:
   loki_data:
