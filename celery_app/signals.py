@@ -10,12 +10,8 @@ propagator = TraceContextTextMapPropagator()
 @task_prerun.connect
 def task_prerun_handler(sender=None, task_id=None, task=None, **kwargs):
     headers = task.request.get("headers", {})
-    carrier = headers.get("tracing", {})
 
-    if not carrier:
-        return
-
-    context = propagator.extract(carrier)
+    context = propagator.extract(headers)
     token = attach(context)
     task.request.otel_token = token
 

@@ -18,7 +18,10 @@ opentelemetry-exporter-otlp==1.25.0
 opentelemetry-instrumentation-fastapi==0.46b0
 opentelemetry-instrumentation-celery==0.46b0
 opentelemetry-instrumentation-redis==0.46b0
+opentelemetry-instrumentation-logging==0.46b0
+
 
 # ---- Config & Validation ----
 pydantic==2.9.2
 pydantic-settings==2.5.2
+

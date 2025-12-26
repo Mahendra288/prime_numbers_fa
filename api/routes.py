@@ -30,7 +30,6 @@ def start_prime_request(no_of_primes: int = Query(..., gt=0)):
 
     db: Session = SessionLocal()
     try:
-        # 1️⃣ Create a queued request in DB
         prime_request = PrimeNumberRequest(
             no_of_primes=no_of_primes,
             status=PrimeNumberRequestStatus.QUEUED
@@ -39,7 +38,6 @@ def start_prime_request(no_of_primes: int = Query(..., gt=0)):
         db.commit()
         db.refresh(prime_request)
 
-        # 2️⃣ Start Celery task and attach task id
         with tracer.start_as_current_span("fastapi-server.find-primes-api") as span:
             async_task = find_n_primes.delay(
                 no_of_primes=no_of_primes,
@@ -56,7 +54,6 @@ def start_prime_request(no_of_primes: int = Query(..., gt=0)):
             span.set_attribute("prime_number_request_id", prime_request.request_id)
             span.add_event(f"Pushed to Celery queue: {async_task.id}")
 
-        # 3️⃣ Respond
         response = {"request_id": prime_request.request_id}
         logging.info(f"API Response: {json.dumps(response)}")
         return response
@@ -84,7 +81,7 @@ def get_prime_request_status(request_id: str = Query(...)):
             "result": primes
         }
 
-        logging.info(f"API Response: {response}")
+        logging.info(f"API Response: {json.dumps(response)}")
         return response
 
     finally:

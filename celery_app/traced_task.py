@@ -14,7 +14,11 @@ class TracedTask(celery_app.Task):
         propagator.inject(carrier, context=get_current())
 
         headers = options.get("headers") or {}
-        headers["tracing"] = carrier
+
+        for k, v in carrier.items():
+            if isinstance(v, str):
+                headers[k] = v
+
         options["headers"] = headers
 
         return super().apply_async(args, kwargs, **options)
