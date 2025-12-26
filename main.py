@@ -9,7 +9,7 @@ from fastapi import FastAPI
 app = FastAPI(title=settings.APP_NAME)
 init_fastapi_otel(app)
 
-# Create DB tables
+# Create DB tables, can be improved using alembic full migrations support to track & apply table changes
 from db.session import engine
 from db.base import Base
 Base.metadata.create_all(bind=engine)
