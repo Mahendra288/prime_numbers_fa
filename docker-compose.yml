@@ -34,10 +34,10 @@ services:
       dockerfile: Dockerfile
     container_name: fastapi_app
     command: >
-      uvicorn main:app
+      sh -c "alembic upgrade head && uvicorn main:app
       --host 0.0.0.0
       --port 8000
-      --reload
+      --reload"
     volumes:
       - .:/code
     ports:
